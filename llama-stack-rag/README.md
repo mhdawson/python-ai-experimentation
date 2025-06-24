@@ -33,7 +33,15 @@ Initially generated with assistance from cursor with Claude-4-sonnet
 
 ## Running
 
-run
+Update these two line in llama-stack-rag1.py to point to the Llama Stack
+instance you want to use along with the name of the model 
+
+```
+LLAMA_STACK_URL = "http://10.1.2.128:8321"
+MODEL_NAME = "meta-llama/Llama-3.1-8B-Instruct"
+```
+
+The run:
 
 ```bash
 python llama-stack-rag1.py
