@@ -14,7 +14,7 @@ Initially generated with assistance from cursor with Claude-4-sonnet
 
 ```bash
    git clone https://github.com/mhdawson/python-ai-experimentation.git
-   cd python-ai-experimentation
+   cd python-ai-experimentation/llama-stack-rag
 ```
 
 2) install requirements 
@@ -33,4 +33,8 @@ Initially generated with assistance from cursor with Claude-4-sonnet
 
 ## Running
 
-run `python llama-stack-rag1.py`
+run
+
+```bash
+python llama-stack-rag1.py
+```
