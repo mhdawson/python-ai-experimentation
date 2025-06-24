@@ -22,7 +22,7 @@ Initially generated with assistance from cursor with Claude-4-sonnet
 ```bash
    uv venv
    source .venv/bin/activate
-   uv pip install -r requirements
+   uv pip install -r requirements.txt
 ```
 
 3) clone the Node.js reference architecture repository
