@@ -33,7 +33,7 @@ Initially generated with assistance from cursor with Claude-4-sonnet
 
 ## Running
 
-Update these two line in llama-stack-rag1.py to point to the Llama Stack
+Update these two lines in llama-stack-rag1.py to point to the Llama Stack
 instance you want to use along with the name of the model 
 
 ```
