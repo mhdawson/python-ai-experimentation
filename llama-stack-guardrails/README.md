@@ -38,7 +38,7 @@ client = LlamaStackClient(
 
 ```
 
-The run:
+Then run:
 
 ```bash
 python llama-stack-guardrails.py
