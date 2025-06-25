@@ -11,7 +11,7 @@ to Python with assistance from cursor with Claude-4-sonnet
 
 ```bash
    git clone https://github.com/mhdawson/python-ai-experimentation.git
-   cd python-ai-experimentation/llama-stack-local-function-calling
+   cd python-ai-experimentation/llama-stack-guardrails
 ```
 
 2) install requirements 
