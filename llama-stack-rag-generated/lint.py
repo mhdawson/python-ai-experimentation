@@ -13,10 +13,7 @@ def run_ruff_on_file(file_path):
     """Run ruff on a single file and return the results."""
     try:
         result = subprocess.run(
-            ["ruff", "check", str(file_path)],
-            capture_output=True,
-            text=True,
-            check=False,
+            ["ruff", "check", str(file_path)], capture_output=True, text=True, check=False
         )
         return {
             "file": str(file_path),
@@ -75,9 +72,7 @@ def count_ruff_issues(output):
         return 0
     lines = output.strip().split("\n")
     # Each line in ruff output represents an issue
-    return len(
-        [line for line in lines if line.strip() and not line.startswith("Found")]
-    )
+    return len([line for line in lines if line.strip() and not line.startswith("Found")])
 
 
 def run_format_check():

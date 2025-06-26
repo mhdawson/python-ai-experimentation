@@ -10,11 +10,11 @@ Initially generated with assistance from cursor with Claude-4-sonnet
 
 ## Installing
 
-1) clone the repository and move to python-ai-experimentation directory
+1) clone the repository and move to python-ai-experimentation/llama-stack-rag-generated directory
 
 ```bash
    git clone https://github.com/mhdawson/python-ai-experimentation.git
-   cd python-ai-experimentation/llama-stack-rag
+   cd python-ai-experimentation/llama-stack-rag-generated
 ```
 
 2) install requirements 
