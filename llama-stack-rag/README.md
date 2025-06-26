@@ -42,7 +42,7 @@ client = LlamaStackClient(
 Then run:
 
 ```bash
-python llama-stack-agent-rag.py.py
+python llama-stack-agent-rag.py
 ```
 
 or
