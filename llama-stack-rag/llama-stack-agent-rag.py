@@ -22,17 +22,6 @@ client = LlamaStackClient(
 
 def main():
     ########################
-    # Register the model we would like to use from ollama
-    """
-    client.models.register(
-        model_id=model_id,
-        provider_id='ollama',
-        provider_model_id='llama3.1:8b-instruct-q4_K_M',
-        model_type='llm',
-    )
-    """
-
-    ########################
     # Create the RAG database
 
     # use the first available provider
