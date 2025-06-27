@@ -1,26 +1,9 @@
 #!/usr/bin/env python3
-"""
-Llama Stack Local MCP with Python Server
-
-This script demonstrates how to use a local Python MCP server with Llama Stack.
-It directly spawns and connects to the Python MCP server from favorite-server-python/
-instead of relying on external toolgroup registration.
-
-Features:
-1. Tests the MCP server directly to ensure it works
-2. Registers the MCP server with Llama Stack
-3. Creates an agent that can use the MCP tools
-4. Runs a series of test questions to demonstrate functionality
-
-The Python MCP server provides two tools:
-- favorite_color_tool: Returns favorite colors for supported locations
-- favorite_hockey_tool: Returns favorite hockey teams for supported locations
-
-Supported locations: Ottawa, Canada and Montreal, Canada
-"""
 
 import logging
 import asyncio
+import os
+from typing import List, Dict
 from llama_stack_client import LlamaStackClient
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -43,207 +26,231 @@ def log(message):
         print(message)
 
 
-async def test_mcp_server_directly():
-    """Test the MCP server directly to verify it works"""
-    print("Testing MCP server directly...")
+async def handle_response(
+    messages: List[Dict], response, mcp_session, available_tools
+) -> str:
+    """Handle responses which may include a request to run a function"""
+
+    # Push the model's response to the chat (in API-compatible format)
+    # Convert completion_message to proper dict format first
+    completion_message_dict = {
+        "role": response.completion_message.role,
+        "content": response.completion_message.content,
+        "stop_reason": getattr(response.completion_message, "stop_reason", None),
+        "tool_calls": getattr(response.completion_message, "tool_calls", None),
+    }
+    messages.append(completion_message_dict)
+
+    # Check if there are tool calls to handle
+    if (
+        hasattr(response.completion_message, "tool_calls")
+        and response.completion_message.tool_calls
+        and len(response.completion_message.tool_calls) > 0
+    ):
+
+        for tool_call in response.completion_message.tool_calls:
+            # Log the function calls so that we see when they are called
+            log(f"  FUNCTION CALLED WITH: {tool_call}")
+            print(f"  CALLED: {tool_call.tool_name}")
+
+            try:
+                # Call the MCP server tool
+                func_response = await mcp_session.call_tool(
+                    tool_call.tool_name, arguments=tool_call.arguments or {}
+                )
+
+                # Add tool responses to messages (in API-compatible format)
+                if func_response.content:
+                    for content_item in func_response.content:
+                        if (
+                            hasattr(content_item, "type")
+                            and content_item.type == "text"
+                        ):
+                            messages.append(
+                                {
+                                    "role": "tool",
+                                    "content": str(content_item.text),
+                                    "call_id": str(tool_call.call_id),
+                                    "tool_name": str(tool_call.tool_name),
+                                }
+                            )
+                        else:
+                            messages.append(
+                                {
+                                    "role": "tool",
+                                    "content": str(content_item),
+                                    "call_id": str(tool_call.call_id),
+                                    "tool_name": str(tool_call.tool_name),
+                                }
+                            )
+            except Exception as e:
+                messages.append(
+                    {
+                        "role": "tool",
+                        "content": f"tool call failed: {e}",
+                        "call_id": getattr(tool_call, "call_id", "unknown"),
+                        "tool_name": tool_call.tool_name,
+                    }
+                )
+
+        # Call the model again so that it can process the data returned by the function calls
+        # (same as JavaScript version - use the same messages array with tool results added)
+        try:
+            # Call the model again with the conversation history including tool results
+            next_response = client.inference.chat_completion(
+                messages=messages,
+                model_id=model_id,
+                tools=available_tools,
+            )
+
+            # Recursively call handleResponse with the same messages array (like JavaScript)
+            return await handle_response(
+                messages, next_response, mcp_session, available_tools
+            )
+
+        except Exception as e:
+            return f"Error processing tool results: {e}"
+
+    else:
+        # No function calls, just return the response
+        return str(response.completion_message.content)
+
+
+async def main():
+    """Main function that handles MCP server communication and tool calls"""
 
     # Server parameters for the Python favorite server
     server_params = StdioServerParameters(
-        command="python", args=["favorite-server/server.py"], env=None
+        command="python",
+        args=[os.path.abspath("favorite-server/server.py")],
+        env=None,
     )
 
-    try:
-        async with stdio_client(server_params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+    # Connect to the MCP server
+    async with stdio_client(server_params) as (read, write):
+        async with ClientSession(read, write) as mcp_session:
+            # Initialize the connection
+            await mcp_session.initialize()
 
-                # List available tools
-                tools = await session.list_tools()
-                print("✅ MCP Server connected successfully!")
-                print(f"Available tools: {[tool.name for tool in tools.tools]}")
+            #####################################
+            # Start MCP server and get the available tools from the MCP server
+            tools_response = await mcp_session.list_tools()
+            tools_list = tools_response.tools
 
-                # Test the favorite_color_tool
-                result = await session.call_tool(
-                    "favorite_color_tool",
-                    arguments={"city": "Ottawa", "country": "Canada"},
-                )
-                # Handle different content types safely
-                if result.content and len(result.content) > 0:
-                    content = result.content[0]
-                    # Check if it's a TextContent type
-                    if (
-                        hasattr(content, "type")
-                        and content.type == "text"
-                        and hasattr(content, "text")
-                    ):
-                        print(f"Test result: {content.text}")
-                    else:
-                        print(f"Test result: {str(content)}")
+            #############################
+            # Convert the description of the tools to the format needed by llama-stack
+            # (exactly like JavaScript version)
+            available_tools = []
+            for tool in tools_list:
+                # Convert tool object in place like JavaScript version
+                tool_dict = {
+                    "tool_name": tool.name,
+                    "description": tool.description,
+                    "parameters": (
+                        tool.inputSchema.get("properties", {})
+                        if hasattr(tool, "inputSchema")
+                        else {}
+                    ),
+                }
 
-                return True
+                # Convert parameter format exactly like JavaScript
+                if (
+                    hasattr(tool, "inputSchema")
+                    and tool.inputSchema
+                    and "properties" in tool.inputSchema
+                ):
+                    for param_name, parameter in tool_dict["parameters"].items():
+                        # Convert type to param_type like JavaScript
+                        if "type" in parameter:
+                            parameter["param_type"] = parameter["type"]
+                            del parameter["type"]
 
-    except Exception as e:
-        print(f"❌ Error connecting to MCP server: {e}")
-        return False
+                        # Add required flag like JavaScript
+                        if (
+                            "required" in tool.inputSchema
+                            and param_name in tool.inputSchema["required"]
+                        ):
+                            parameter["required"] = True
 
+                available_tools.append(tool_dict)
 
-def register_mcp_server_with_llama_stack():
-    """Register the MCP server with Llama Stack using subprocess approach"""
-    print("Registering MCP server with Llama Stack...")
+            #############################
+            # ASK QUESTIONS
+            questions = [
+                "What is my favorite color?",
+                "My city is Ottawa",
+                "My country is Canada",
+                "I moved to Montreal. What is my favorite color now?",
+                "My city is Montreal and my country is Canada",
+                "What is the fastest car in the world?",
+                "My city is Ottawa and my country is Canada, what is my favorite color?",
+                "What is my favorite hockey team ?",
+                "My city is Montreal and my country is Canada",
+                "Who was the first president of the United States?",
+            ]
 
-    try:
-        # Register the MCP toolgroup pointing to our local Python server
-        # Note: The exact format may vary depending on Llama Stack version
-        client.toolgroups.register(
-            toolgroup_id="mcp::local_favorites",
-            provider_id="model-context-protocol",
-            # For local development, try HTTP endpoint format
-            mcp_endpoint={"uri": "http://localhost:8002/sse"},
-        )
-        print("✅ MCP toolgroup registered successfully!")
-        return True
+            for j in range(1):
+                # Maintains chat history (same as JavaScript version)
+                messages = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "only answer questions about a favorite color by using the response from the favorite_color_tool "
+                            "only answer questions about a favorite hockey team by using the response from the favorite_hockey_tool "
+                            "when asked for a favorite color if you have not called the favorite_color_tool, call it "
+                            "if the assistance does not have the parameters to call a tool, ask the user for them by name"
+                            "Never guess a favorite color "
+                            "Do not be chatty "
+                            "Give short answers when possible"
+                        ),
+                    }
+                ]
 
-    except Exception as e:
-        print(f"❌ Error registering MCP toolgroup: {e}")
-        print("Note: This may fail if Llama Stack doesn't support stdio MCP endpoints")
-        return False
+                print(f"\nIteration {j} " + "-" * 60)
 
+                for i, question in enumerate(questions):
+                    print(f"QUESTION: {question}")
+                    messages.append({"role": "user", "content": question})
 
-def main():
-    print("=== Llama Stack Local MCP with Python Server ===")
-    print("Using the Python MCP server from favorite-server-python/")
-    print()
+                    try:
+                        # Call the inference API with tools (same as JavaScript version)
+                        # For now, use simple message format to avoid type issues
+                        simple_messages = []
+                        for msg in messages:
+                            if msg["role"] in ["user", "system"]:
+                                simple_messages.append(
+                                    {"role": msg["role"], "content": msg["content"]}
+                                )
 
-    # First test the MCP server directly to make sure it works
-    print("Step 1: Testing MCP server directly...")
-    if not asyncio.run(test_mcp_server_directly()):
-        print(
-            "❌ MCP server test failed. Please check favorite-server-python/server.py"
-        )
-        return 1
-
-    print("\nStep 2: Registering MCP server with Llama Stack...")
-
-    # Try to register with Llama Stack
-    # Note: This may not work if Llama Stack doesn't support local stdio MCP servers
-    # In that case, we fall back to the toolgroup approach
-    try:
-        # Try the direct registration approach first
-        if not register_mcp_server_with_llama_stack():
-            print("Direct registration failed, falling back to toolgroup approach...")
-            print("You may need to run 'python llama-stack-register-mcp.py' separately")
-            print("and ensure the MCP server is running externally")
-
-            # Use the external toolgroup approach
-            toolgroup_id = "mcp::mcp_favorites"
-        else:
-            toolgroup_id = "mcp::local_favorites"
-
-    except Exception as e:
-        print(f"Registration error: {e}")
-        print("Falling back to external toolgroup approach...")
-        toolgroup_id = "mcp::mcp_favorites"
-
-    # Create the agent with MCP toolgroup
-    try:
-        agentic_system_create_response = client.agents.create(
-            agent_config={
-                "model": model_id,
-                "instructions": (
-                    "only answer questions about a favorite color by using the response from the favorite_color_tool. "
-                    "only answer questions about a favorite hockey team by using the response from the favorite_hockey_tool. "
-                    "when asked for a favorite color if you have not called the favorite_color_tool, call it. "
-                    "Never guess a favorite color. "
-                    "Do not be chatty. "
-                    "Give short answers when possible"
-                ),
-                "toolgroups": [toolgroup_id],
-                "tool_choice": "auto",
-                "input_shields": [],
-                "output_shields": [],
-                "max_infer_iters": 10,
-            }
-        )
-        agent_id = agentic_system_create_response.agent_id
-        print(f"✅ Agent created with ID: {agent_id}")
-
-        # Create a session
-        session_create_response = client.agents.session.create(
-            agent_id, session_name="local_mcp_session"
-        )
-        session_id = session_create_response.session_id
-        print(f"✅ Session created with ID: {session_id}")
-
-    except Exception as e:
-        print(f"❌ Error creating agent: {e}")
-        print("Make sure:")
-        print("1. Llama Stack server is running")
-        print("2. MCP toolgroup is properly registered")
-        print("3. favorite-server-python/server.py is working")
-        return 1
-
-    print("\nStep 3: Testing agent with questions...")
-    print("=" * 60)
-
-    #############################
-    # ASK QUESTIONS
-
-    questions = [
-        "What is my favorite color?",
-        "My city is Ottawa",
-        "My country is Canada",
-        "I moved to Montreal. What is my favorite color now?",
-        "My city is Montreal and my country is Canada",
-        "What is the fastest car in the world?",
-        "My city is Ottawa and my country is Canada, what is my favorite color?",
-        "What is my favorite hockey team?",
-        "My city is Montreal and my country is Canada",
-        "Who was the first president of the United States?",
-    ]
-
-    for j in range(1):
-        print(f"\nIteration {j+1}")
-        print("-" * 60)
-
-        for i, question in enumerate(questions):
-            print(f"\nQUESTION {i+1}: {question}")
-            try:
-                response_stream = client.agents.turn.create(
-                    session_id,
-                    agent_id=agent_id,
-                    stream=True,
-                    messages=[{"role": "user", "content": question}],
-                )
-
-                response = ""
-                for chunk in response_stream:
-                    # Check for errors in the response
-                    if hasattr(chunk, "error") and getattr(chunk, "error", None):
-                        error_msg = getattr(chunk, "error", {}).get(
-                            "message", "Unknown error"
-                        )
-                        print(f"  ❌ ERROR: {error_msg}")
-                        break
-                    # Check for successful turn completion
-                    elif (
-                        hasattr(chunk, "event")
-                        and getattr(chunk, "event", None)
-                        and hasattr(chunk.event, "payload")
-                        and chunk.event.payload.event_type == "turn_complete"
-                    ):
-                        response = response + str(
-                            chunk.event.payload.turn.output_message.content
+                        response = client.inference.chat_completion(
+                            messages=simple_messages,
+                            model_id=model_id,
+                            tools=available_tools,
                         )
 
-                print(f"  RESPONSE: {response}")
+                        # Use handleResponse to process the response and any tool calls
+                        answer = await handle_response(
+                            messages, response, mcp_session, available_tools
+                        )
+                        print(f"  RESPONSE: {answer}")
 
-            except Exception as e:
-                print(f"  ❌ ERROR: {e}")
+                    except Exception as e:
+                        print(f"  ERROR: {e}")
+                        # Continue with next question
+                        continue
 
-    print("\n" + "=" * 60)
-    print("✅ Testing completed!")
-    return 0
+
+def run_main():
+    """Synchronous wrapper for the async main function"""
+    try:
+        return asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n⚠️  Interrupted by user")
+        return 1
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return 1
 
 
 if __name__ == "__main__":
-    exit(main())
+    exit(run_main())
