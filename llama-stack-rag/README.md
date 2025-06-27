@@ -1,4 +1,4 @@
-# Llama Stack guardrails example with Python
+# Llama Stack rag example with Python
 
 Initially converted from the JavaScript version in
 [ai-tool-experimentation/llama-stack-rag](https://github.com/mhdawson/ai-tool-experimentation/tree/main/llama-stack-rag)
