@@ -31,7 +31,7 @@ async def handle_response(
 ) -> str:
     """Handle responses which may include a request to run a function"""
 
-    # Push the model's response to the chat (in API-compatible format)
+    # Push the model's response to the chat
     # Convert completion_message to proper dict format first
     completion_message_dict = {
         "role": response.completion_message.role,
@@ -47,7 +47,6 @@ async def handle_response(
         and response.completion_message.tool_calls
         and len(response.completion_message.tool_calls) > 0
     ):
-
         for tool_call in response.completion_message.tool_calls:
             # Log the function calls so that we see when they are called
             log(f"  FUNCTION CALLED WITH: {tool_call}")
@@ -62,27 +61,14 @@ async def handle_response(
                 # Add tool responses to messages (in API-compatible format)
                 if func_response.content:
                     for content_item in func_response.content:
-                        if (
-                            hasattr(content_item, "type")
-                            and content_item.type == "text"
-                        ):
-                            messages.append(
-                                {
-                                    "role": "tool",
-                                    "content": str(content_item.text),
-                                    "call_id": str(tool_call.call_id),
-                                    "tool_name": str(tool_call.tool_name),
-                                }
-                            )
-                        else:
-                            messages.append(
-                                {
-                                    "role": "tool",
-                                    "content": str(content_item),
-                                    "call_id": str(tool_call.call_id),
-                                    "tool_name": str(tool_call.tool_name),
-                                }
-                            )
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "content": str(content_item.text),
+                                "call_id": str(tool_call.call_id),
+                                "tool_name": str(tool_call.tool_name),
+                            }
+                        )
             except Exception as e:
                 messages.append(
                     {
@@ -94,7 +80,6 @@ async def handle_response(
                 )
 
         # Call the model again so that it can process the data returned by the function calls
-        # (same as JavaScript version - use the same messages array with tool results added)
         try:
             # Call the model again with the conversation history including tool results
             next_response = client.inference.chat_completion(
@@ -103,7 +88,7 @@ async def handle_response(
                 tools=available_tools,
             )
 
-            # Recursively call handleResponse with the same messages array (like JavaScript)
+            # now handle the response which may include additional tool calls
             return await handle_response(
                 messages, next_response, mcp_session, available_tools
             )
@@ -139,10 +124,8 @@ async def main():
 
             #############################
             # Convert the description of the tools to the format needed by llama-stack
-            # (exactly like JavaScript version)
             available_tools = []
             for tool in tools_list:
-                # Convert tool object in place like JavaScript version
                 tool_dict = {
                     "tool_name": tool.name,
                     "description": tool.description,
@@ -153,19 +136,15 @@ async def main():
                     ),
                 }
 
-                # Convert parameter format exactly like JavaScript
                 if (
                     hasattr(tool, "inputSchema")
                     and tool.inputSchema
                     and "properties" in tool.inputSchema
                 ):
                     for param_name, parameter in tool_dict["parameters"].items():
-                        # Convert type to param_type like JavaScript
                         if "type" in parameter:
                             parameter["param_type"] = parameter["type"]
                             del parameter["type"]
-
-                        # Add required flag like JavaScript
                         if (
                             "required" in tool.inputSchema
                             and param_name in tool.inputSchema["required"]
@@ -190,7 +169,7 @@ async def main():
             ]
 
             for j in range(1):
-                # Maintains chat history (same as JavaScript version)
+                # Maintains chat history
                 messages = [
                     {
                         "role": "system",
@@ -213,17 +192,8 @@ async def main():
                     messages.append({"role": "user", "content": question})
 
                     try:
-                        # Call the inference API with tools (same as JavaScript version)
-                        # For now, use simple message format to avoid type issues
-                        simple_messages = []
-                        for msg in messages:
-                            if msg["role"] in ["user", "system"]:
-                                simple_messages.append(
-                                    {"role": msg["role"], "content": msg["content"]}
-                                )
-
                         response = client.inference.chat_completion(
-                            messages=simple_messages,
+                            messages=messages,
                             model_id=model_id,
                             tools=available_tools,
                         )
