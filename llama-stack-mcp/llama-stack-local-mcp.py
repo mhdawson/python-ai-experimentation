@@ -131,25 +131,18 @@ async def main():
                     "description": tool.description,
                     "parameters": (
                         tool.inputSchema.get("properties", {})
-                        if hasattr(tool, "inputSchema")
-                        else {}
                     ),
                 }
 
-                if (
-                    hasattr(tool, "inputSchema")
-                    and tool.inputSchema
-                    and "properties" in tool.inputSchema
-                ):
-                    for param_name, parameter in tool_dict["parameters"].items():
-                        if "type" in parameter:
-                            parameter["param_type"] = parameter["type"]
-                            del parameter["type"]
-                        if (
-                            "required" in tool.inputSchema
-                            and param_name in tool.inputSchema["required"]
-                        ):
-                            parameter["required"] = True
+                for param_name, parameter in tool_dict["parameters"].items():
+                    if "type" in parameter:
+                        parameter["param_type"] = parameter["type"]
+                        del parameter["type"]
+                    if (
+                        "required" in tool.inputSchema
+                        and param_name in tool.inputSchema["required"]
+                    ):
+                        parameter["required"] = True
 
                 available_tools.append(tool_dict)
 
