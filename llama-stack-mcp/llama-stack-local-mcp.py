@@ -64,9 +64,9 @@ async def handle_response(
                         messages.append(
                             {
                                 "role": "tool",
-                                "content": str(content_item.text),
-                                "call_id": str(tool_call.call_id),
-                                "tool_name": str(tool_call.tool_name),
+                                "content": content_item.text,
+                                "call_id": tool_call.call_id,
+                                "tool_name": tool_call.tool_name,
                             }
                         )
             except Exception as e:
