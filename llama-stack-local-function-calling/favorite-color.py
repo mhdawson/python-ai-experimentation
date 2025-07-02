@@ -29,12 +29,10 @@ available_tools = [
         "parameters": {
             "city": {
                 "param_type": "string",
-                "description": "the city for the person",
                 "required": True,
             },
             "country": {
                 "param_type": "string",
-                "description": "the country for the person",
                 "required": True,
             },
         },
