@@ -11,7 +11,7 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Configuration
 model_id = "meta-llama/Llama-3.1-8B-Instruct"
-SHOW_RAG_DOCUMENTS = True
+SHOW_RAG_DOCUMENTS = False
 
 # Initialize client
 client = LlamaStackClient(
