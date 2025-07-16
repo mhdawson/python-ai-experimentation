@@ -101,20 +101,8 @@ def main():
             )
 
             rag_results = []
-            try:
-                if (
-                    raw_rag_results
-                    and hasattr(raw_rag_results, "content")
-                    and raw_rag_results.content
-                ):
-                    for content_item in raw_rag_results.content:
-                        # Try to extract text content in various ways
-                        if hasattr(content_item, "text") and content_item.text:
-                            rag_results.append(str(content_item.text))
-                        elif isinstance(content_item, str):
-                            rag_results.append(content_item)
-            except Exception as e:
-                print(f"Warning: Could not extract RAG content: {e}")
+            for content_item in raw_rag_results.content:
+                rag_results.append(str(content_item.text))
 
             if SHOW_RAG_DOCUMENTS:
                 for result in rag_results:
@@ -124,26 +112,13 @@ def main():
                    <question>{question}</question>
                    <context>{' '.join(rag_results)}</context>"""
 
-            # Simple message format - just use the prompt directly
-            try:
-                messages.append({"role": "user", "content": prompt})
-                response = client.inference.chat_completion(
-                    messages=messages,
-                    model_id=model_id,
-                )
+            messages.append({"role": "user", "content": prompt})
+            response = client.inference.chat_completion(
+                messages=messages,
+                model_id=model_id,
+            )
 
-                # Handle response content
-                response_content = ""
-                if (
-                    hasattr(response, "completion_message")
-                    and response.completion_message
-                ):
-                    if hasattr(response.completion_message, "content"):
-                        response_content = str(response.completion_message.content)
-
-                print("  RESPONSE:" + response_content)
-            except Exception as e:
-                print(f"  ERROR: Could not get response: {e}")
+            print("  RESPONSE:" + response.completion_message.content)
 
     ########################
     # REMOVE DATABASE
