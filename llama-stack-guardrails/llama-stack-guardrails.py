@@ -23,6 +23,12 @@ def main():
         provider_model_id="llama-guard3:8b",
         model_type="llm",
     )
+    client.models.register(
+        model_id="meta-llama/Llama-3.1-8B-Instruct",
+        provider_id="ollama",
+        provider_model_id="llama3.1:8b-instruct-fp16",
+        model_type="llm",
+    )
 
     #######################
     # Register shields
