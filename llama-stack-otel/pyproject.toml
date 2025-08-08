@@ -1,0 +1,4 @@
+[tool.ruff.lint]
+# Exclude E402 (module level import not at top of file) since OpenTelemetry
+# instrumentation requires imports to be after the telemetry setup
+ignore = ["E402"]

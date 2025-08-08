@@ -1,0 +1,1 @@
+export OTEL_SERVICE_NAME=PytonAgentRAG
