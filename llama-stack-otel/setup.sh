@@ -1,1 +1,1 @@
-export OTEL_SERVICE_NAME=PytonAgentRAG
+export OTEL_SERVICE_NAME=PythonAgentRAG
